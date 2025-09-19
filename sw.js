@@ -1,9 +1,11 @@
-/* sw.js — PWA Service Worker для MAX (демо)
-   Предкеш оболочки, оффлайн, обновления, навигационный preload,
-   кэширование Google Fonts (fonts.googleapis.com/.gstatic.com).
+/* sw.js — PWA Service Worker для MAX (GitHub Pages friendly)
+   — Скоуп-осознанные пути (работает в подкаталоге /repo/)
+   — Предкеш оболочки, оффлайн-страница, SPA-фоллбек
+   — Навигационный preload, кэш Google Fonts
+   — Обновления через SKIP_WAITING + clients.claim()
    Цвета: theme=#667eea, background=#E8E5FF
 */
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const PREFIX  = 'maxdemo';
 const SHELL   = `${PREFIX}-shell-${VERSION}`;
 const RUNTIME = `${PREFIX}-rt-${VERSION}`;
@@ -11,12 +13,21 @@ const RUNTIME = `${PREFIX}-rt-${VERSION}`;
 const THEME = '#667eea';
 const BG    = '#E8E5FF';
 
+/* ВСПОМОГАТЕЛЬНОЕ:
+   Гарантируем, что любые относительные пути резолвятся в рамки текущего scope SW
+   (например, https://username.github.io/repo/).
+*/
+const SCOPE = self.registration?.scope || self.location.href;
+const U = (p) => new URL(p, SCOPE);           // URL-объект внутри scope
+const US = (p) => U(p).toString();             // строка URL
+
+// Что кэшируем как оболочку приложения:
 const APP_SHELL = [
-  '/',              // если сайт из корня
-  '/index.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  US('./'),                 // корень страницы в подкаталоге
+  US('index.html'),
+  US('manifest.json'),
+  US('icons/icon-192.png'),
+  US('icons/icon-512.png')
 ];
 
 // оффлайн-экран (встроенный)
@@ -43,128 +54,141 @@ small{display:block;margin-top:10px;color:#6b6a86}
 <small>Демо оффлайн-страница (theme=${THEME}, bg=${BG})</small>
 </div></div></body></html>`;
 
-// Установка
+// Куда положим встроенный оффлайн HTML в кэш (внутри scope!)
+const OFFLINE_KEY = US('__offline.html');
+
+// -------------------- INSTALL --------------------
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL);
+    // Предкеш оболочки
     for (const url of APP_SHELL) {
-      try { await cache.add(new Request(url, { credentials:'same-origin' })); } catch(_) {}
+      try {
+        await cache.add(new Request(url, { credentials: 'same-origin' }));
+      } catch (_) { /* мимо */ }
     }
-    await cache.put('/__offline.html', new Response(OFFLINE_HTML, { headers:{'Content-Type':'text/html; charset=utf-8'} }));
+    // Встроенный оффлайн
+    await cache.put(OFFLINE_KEY, new Response(OFFLINE_HTML, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    }));
     await self.skipWaiting();
   })());
 });
 
-// Активация
+// -------------------- ACTIVATE --------------------
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
+    // Навигационный preload
     if (self.registration.navigationPreload) {
-      try { await self.registration.navigationPreload.enable(); } catch(_) {}
+      try { await self.registration.navigationPreload.enable(); } catch (_) {}
     }
+    // Сносим старые кэши
     const keys = await caches.keys();
-    await Promise.all(keys.map(k => (k.startsWith(PREFIX) && k !== SHELL && k !== RUNTIME) ? caches.delete(k) : null));
+    await Promise.all(
+      keys.map(k => (k.startsWith(PREFIX) && k !== SHELL && k !== RUNTIME) ? caches.delete(k) : null)
+    );
+    // Захватываем клиентов сразу
     await self.clients.claim();
   })());
 });
 
-// Хелпер оффлайна
-async function offlineFallback() {
-  return (await caches.match('/offline.html')) || (await caches.match('/__offline.html')) ||
-         new Response(OFFLINE_HTML, { headers:{'Content-Type':'text/html; charset=utf-8'} });
-}
-
+// -------------------- MESSAGES --------------------
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  const msg = event?.data || {};
+  if (msg.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  if (msg.type === 'SILENT_TERMINATE') {
+    event.waitUntil((async () => {
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+      for (const c of clientsList) {
+        try { await c.navigate(US('__closed.html')); } catch (_) {}
+      }
+      // Можно дополнительно сделать: await self.registration.unregister();
+    })());
   }
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
+// -------------------- HELPERS --------------------
+async function offlineFallback() {
+  // сначала пробуем явный оффлайн-ресурс в кэше по ключу OFFLINE_KEY
+  const cached = await caches.match(OFFLINE_KEY);
+  if (cached) return cached;
+  // на крайний случай — восстановим из строки
+  return new Response(OFFLINE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+}
 
-// Fetch-стратегии:
-// - Навигации (HTML): network-first (+preload), затем shell, затем оффлайн.
-// - Статика своего домена: stale-while-revalidate.
-// - Google Fonts (gstatic/css): stale-while-revalidate, разрешаем кэш opaque/200.
+function isStaticAsset(url) {
+  return /\.(css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(url.pathname);
+}
+
+// -------------------- FETCH --------------------
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Google Fonts — отдельная ветка (кросс-домен)
+  // Google Fonts — отдельная стратегия (кросс-домен)
   const isGF = (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com');
 
-  // Навигации
+  // HTML-навигации: network-first (+preload) → кэш оболочки → оффлайн/SPA-фоллбек
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try {
+        // навигационный preload, если браузер поддерживает
         const preload = await event.preloadResponse;
         if (preload) return preload;
-        const network = await fetch(request, { credentials:'same-origin' });
+
+        const network = await fetch(request, { credentials: 'same-origin' });
+        // Если сеть вернула 2xx — отдаём как есть
         if (network && network.ok) return network;
-        const shell = await caches.match('/index.html') || await caches.match(request);
+
+        // При 4xx/5xx стараемся вернуть закэшированную оболочку (SPA-фоллбек)
+        const shell = await caches.match(US('index.html')) || await caches.match(request);
         return shell || await offlineFallback();
       } catch (_) {
-        const shell = await caches.match('/index.html') || await caches.match(request);
+        // Нет сети → оболочка или оффлайн
+        const shell = await caches.match(US('index.html')) || await caches.match(request);
         return shell || await offlineFallback();
       }
     })());
     return;
   }
 
-  // Google Fonts: stale-while-revalidate (кэшируем и opaque, и 200)
+  // Google Fonts: stale-while-revalidate (разрешаем opaque)
   if (isGF) {
     event.respondWith((async () => {
       const cache = await caches.open(RUNTIME);
       const cached = await cache.match(request);
       const fetched = fetch(request, { mode: 'no-cors' }).then(resp => {
         if (resp) {
-          // кэшируем даже opaque (status 0) — это нормально для шрифтов
-          cache.put(request, resp.clone()).catch(()=>{});
+          cache.put(request, resp.clone()).catch(() => {});
         }
         return resp;
-      }).catch(()=>null);
+      }).catch(() => null);
       return cached || (await fetched) || new Response('', { status: 504 });
     })());
     return;
   }
 
   // Своя статика: stale-while-revalidate
-  if (url.origin === location.origin &&
-      /\.(css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(url.pathname)) {
+  if (url.origin === location.origin && isStaticAsset(url)) {
     event.respondWith((async () => {
       const cache = await caches.open(RUNTIME);
       const cached = await cache.match(request);
       const fetched = fetch(request).then(resp => {
         if (resp && (resp.status === 200 || resp.type === 'opaque')) {
-          cache.put(request, resp.clone()).catch(()=>{});
+          cache.put(request, resp.clone()).catch(() => {});
         }
         return resp;
-      }).catch(()=>null);
-      return cached || (await fetched) || (await caches.match(request)) || new Response('',{status:504});
+      }).catch(() => null);
+      return cached || (await fetched) || (await caches.match(request)) || new Response('', { status: 504 });
     })());
     return;
   }
 
-  // Прочее: сеть → кеш → оффлайн
+  // Прочие запросы: сеть → кэш → оффлайн
   event.respondWith((async () => {
     try { return await fetch(request); }
-    catch(_) { return (await caches.match(request)) || await offlineFallback(); }
+    catch (_) { return (await caches.match(request)) || await offlineFallback(); }
   })());
 });
-
-// Сообщения от клиента
-self.addEventListener('message', (event) => {
-  const msg = event?.data || {};
-  if (msg.type === 'SILENT_TERMINATE') {
-    event.waitUntil((async () => {
-      const clientsList = await self.clients.matchAll({ includeUncontrolled:true, type:'window' });
-      for (const c of clientsList) {
-        try { await c.navigate('/__closed.html'); } catch(_) {}
-      }
-      // при желании: await self.registration.unregister();
-    })());
-  }
-  if (msg.type === 'SKIP_WAITING') self.skipWaiting();
-});
-
