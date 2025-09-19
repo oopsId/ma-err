@@ -86,8 +86,17 @@
     .continue-button:disabled{ background:#666 !important; cursor:not-allowed !important; opacity:.6 !important; }
 
     .install-button{ width:100%; padding:12px; background:#667eea; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px; display:none; }
-    .update-banner{ position:fixed; left:12px; right:12px; bottom:12px; background:#1f2937; color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; z-index:1100; box-shadow:0 10px 20px rgba(0,0,0,.25); }
-    .update-banner button{ padding:8px 12px; border:0; border-radius:8px; font-weight:600; cursor:pointer; background:#10b981; color:#0b1020; }
+
+    /* РАНЬШЕ: .update-banner — адблок мог прятать; теперь нейтральное имя */
+    .app-update{
+      position:fixed; left:12px; right:12px; bottom:12px;
+      background:#1f2937; color:#fff; padding:10px 12px; border-radius:10px;
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      z-index:1100; box-shadow:0 10px 20px rgba(0,0,0,.25);
+    }
+    .app-update button{
+      padding:8px 12px; border:0; border-radius:8px; font-weight:600; cursor:pointer; background:#10b981; color:#0b1020;
+    }
 
     .privacy-notice{ font-size:13px; color:#666; line-height:1.4; text-align:center; padding:0 20px; }
     .privacy-link{ color:#007AFF; text-decoration:none; } .privacy-link:hover{ text-decoration:underline; }
@@ -252,40 +261,53 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
              (('standalone' in navigator) && navigator.standalone);
     }
 
-    // --- SW registration + update banner ---
+    // --- SW registration + update toast (adblock-safe) ---
     let waitingSW = null;
+
+    function showUpdateToast(){
+      if (document.getElementById('appUpdate')) return;
+      const el = document.createElement('div');
+      el.className = 'app-update';
+      el.id = 'appUpdate';
+      el.innerHTML = `<span>Доступно обновление</span><button id="appUpdateBtn">Обновить</button>`;
+      document.body.appendChild(el);
+      document.getElementById('appUpdateBtn').onclick = () => {
+        if (waitingSW) waitingSW.postMessage({ type:'SKIP_WAITING' });
+      };
+    }
+
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then(reg => {
-        // ловим обновления
+      navigator.serviceWorker.register('./sw.js').then(async (reg) => {
+        // 1) если уже есть waiting (повторный визит)
+        if (reg.waiting) {
+          waitingSW = reg.waiting;
+          showUpdateToast();
+        }
+
+        // 2) ловим появление нового SW
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
           if (!newSW) return;
           newSW.addEventListener('statechange', () => {
             if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
               waitingSW = newSW;
-              showUpdateBanner();
+              showUpdateToast();
             }
           });
         });
-      }).catch(()=>{});
-      // если уже есть waiting
-      navigator.serviceWorker.getRegistration().then(reg => {
-        if (reg && reg.waiting) { waitingSW = reg.waiting; showUpdateBanner(); }
-      });
-      // перезагружаемся после смены контроллера
-      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
-    }
 
-    function showUpdateBanner(){
-      if (document.getElementById('updBanner')) return;
-      const el = document.createElement('div');
-      el.className = 'update-banner';
-      el.id = 'updBanner';
-      el.innerHTML = `<span>Доступно обновление</span><button id="updBtn">Обновить</button>`;
-      document.body.appendChild(el);
-      document.getElementById('updBtn').onclick = () => {
-        waitingSW && waitingSW.postMessage({ type:'SKIP_WAITING' });
-      };
+        // 3) активный контроль после skipWaiting -> перезагрузка
+        navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+
+        // 4) ЯВНО проверяем обновления сейчас и при возврате вкладки
+        try { await reg.update(); } catch(e) {}
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update().catch(()=>{});
+        });
+
+        // 5) Периодический пинг (раз в 15 минут)
+        setInterval(() => reg.update().catch(()=>{}), 15 * 60 * 1000);
+      }).catch(()=>{ /* молчим, если SW запрещён */ });
     }
 
     // --- Theme color follows system theme ---
@@ -429,4 +451,3 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
   </script>
 </body>
 </html>
-
