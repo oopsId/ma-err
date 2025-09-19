@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAX</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MAX">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="MAX">
+  <meta name="msapplication-TileColor" content="#667eea">
+  <meta name="msapplication-TileImage" content="icons/icon-144.png">
+
+  <!-- Manifest + Icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
+  <link rel="apple-touch-icon" sizes="76x76"  href="icons/icon-76.png">
+  <link rel="apple-touch-icon" sizes="60x60"  href="icons/icon-60.png">
+  <link rel="icon" type="image/png" sizes="32x32"  href="icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16"  href="icons/icon-16.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="shortcut icon" href="icons/icon-32.png">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      min-height:100vh; display:flex; flex-direction:column; transition:all .3s ease;
+      background: linear-gradient(180deg, #E8E5FF 0%, #F5F3FF 100%); color:#1a1a1a;
+    }
+    @media (prefers-color-scheme: dark) {
+      body { background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color:#fff; }
+      .phone-input-container{ background:rgba(255,255,255,.1); backdrop-filter:blur(10px); }
+      .country-selector{ background:rgba(255,255,255,.05); border-right:1px solid rgba(255,255,255,.1); }
+      .phone-input{ color:#fff; } .phone-input::placeholder{ color:rgba(255,255,255,.6); }
+      .title{ color:#fff !important; } .subtitle{ color:rgba(255,255,255,.8) !important; }
+      .help-icon{ background:rgba(255,255,255,.1); color:rgba(255,255,255,.7); }
+      .logo-text{ color:#fff !important; } .privacy-notice{ color:rgba(255,255,255,.7); }
+      .country-code{ color:#fff; }
+      .android-modal-content{ background:#424242; }
+      .android-modal-title{ color:#fff; }
+      .android-modal-message{ color:rgba(255,255,255,.87); }
+      .android-modal-error-code{ color:rgba(255,255,255,.7); background:#616161; border-left-color:#f44336; }
+      .android-modal-button:hover{ background:rgba(255,255,255,.08); }
+      .ios-modal-content{ background:rgba(44,44,46,.95); }
+      .ios-modal-title{ color:#fff; } .ios-modal-message{ color:rgba(255,255,255,.8); }
+      .ios-modal-body{ background:rgba(28,28,30,.8); }
+      .ios-modal-error-code{ color:rgba(255,255,255,.6); background:rgba(255,255,255,.1); }
+      .ios-modal-buttons{ border-top:1px solid rgba(255,255,255,.1); }
+      .ios-modal-button:first-child{ border-right:1px solid rgba(255,255,255,.1); }
+      .ios-modal-button:hover{ background:rgba(255,255,255,.1); }
+    }
+
+    .container{ flex:1; display:flex; flex-direction:column; max-width:400px; width:100%; margin:0 auto; padding:0 20px; }
+    .header{ display:flex; justify-content:center; align-items:center; padding:20px 0; margin-bottom:40px; position:relative; }
+    .logo-container{ display:flex; align-items:center; gap:8px; }
+    .logo-icon{ width:32px; height:32px; background-image:url('icons/max_logo.webp'); background-size:contain; background-repeat:no-repeat; background-position:center; border-radius:8px; display:flex; align-items:center; justify-content:center; }
+    .logo-text{ font-size:24px; font-weight:600; color:#1a1a1a; }
+    .help-icon{ width:32px; height:32px; border-radius:50%; background:rgba(0,0,0,.1); display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:500; color:#666; cursor:pointer; position:absolute; right:0; top:50%; transform:translateY(-50%); }
+
+    .main-content{ flex:1; display:flex; flex-direction:column; justify-content:center; text-align:center; margin-bottom:40px; }
+    .title{ font-size:28px; font-weight:600; color:#1a1a1a; margin-bottom:12px; line-height:1.3; }
+    .subtitle{ font-size:16px; color:#666; margin-bottom:40px; font-weight:400; }
+
+    .phone-input-container{ display:flex; background:#fff; border-radius:12px; padding:0; margin-bottom:40px; box-shadow:0 2px 8px rgba(0,0,0,.1); overflow:hidden; }
+    .country-selector{ display:flex; align-items:center; padding:16px 12px; background:#f8f9fa; border-right:1px solid #e9ecef; gap:8px; cursor:pointer; min-width:80px; }
+    .flag{ width:24px; height:18px; border-radius:2px; }
+    .country-code{ font-size:16px; font-weight:500; color:#1a1a1a; }
+    .dropdown-arrow{ margin-left:4px; }
+    .phone-input{ flex:1; border:none; outline:none; padding:16px; font-size:16px; background:transparent; color:#1a1a1a; }
+    .phone-input::placeholder{ color:#999; }
+
+    .bottom-section{ padding-bottom:40px; }
+    .continue-button{ width:100%; padding:16px; background:#007AFF; color:#fff; border:none; border-radius:12px; font-size:16px; font-weight:600; cursor:pointer; margin-bottom:12px; transition:background-color .2s; }
+    .continue-button:hover{ background:#0056CC; }
+    .continue-button:disabled{ background:#666 !important; cursor:not-allowed !important; opacity:.6 !important; }
+
+    .install-button{ width:100%; padding:12px; background:#667eea; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px; display:none; }
+    .update-banner{ position:fixed; left:12px; right:12px; bottom:12px; background:#1f2937; color:#fff; padding:10px 12px; border-radius:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; z-index:1100; box-shadow:0 10px 20px rgba(0,0,0,.25); }
+    .update-banner button{ padding:8px 12px; border:0; border-radius:8px; font-weight:600; cursor:pointer; background:#10b981; color:#0b1020; }
+
+    .privacy-notice{ font-size:13px; color:#666; line-height:1.4; text-align:center; padding:0 20px; }
+    .privacy-link{ color:#007AFF; text-decoration:none; } .privacy-link:hover{ text-decoration:underline; }
+
+    /* iOS-style modal / Android modal */
+    .ios-modal,.android-modal{ position:fixed; top:0; left:0; width:100%; height:100%; display:none; justify-content:center; align-items:center; z-index:1000; }
+    .ios-modal{ background:rgba(0,0,0,.4); backdrop-filter:blur(10px); }
+    .android-modal{ background:rgba(0,0,0,.5); }
+
+    .ios-modal-content{ background:rgba(255,255,255,.95); border-radius:14px; padding:0; max-width:320px; width:90%; box-shadow:0 20px 40px rgba(0,0,0,.3); backdrop-filter:blur(20px); animation:modalSlideIn .3s ease-out; overflow:hidden; }
+    .android-modal-content{ background:#fff; border-radius:8px; padding:0; max-width:340px; width:90%; box-shadow:0 8px 24px rgba(0,0,0,.4); animation:androidModalSlideIn .25s cubic-bezier(.4,0,.2,1); overflow:hidden; }
+
+    .ios-modal-header{ padding:20px 20px 10px; text-align:center; border-bottom:1px solid rgba(0,0,0,.1); }
+    .ios-modal-title{ font-size:18px; font-weight:600; color:#000; margin:0 0 8px 0; }
+    .ios-modal-message{ font-size:14px; color:#666; line-height:1.4; margin:0; }
+    .ios-modal-body{ padding:15px 20px; text-align:center; background:rgba(248,248,248,.8); }
+    .ios-modal-error-code{ font-family:'SF Mono', Monaco, monospace; font-size:12px; color:#999; background:rgba(0,0,0,.05); padding:8px 12px; border-radius:8px; margin:10px 0; display:inline-block; }
+
+    .android-modal-header{ padding:24px 24px 20px; text-align:left; }
+    .android-modal-title{ font-size:20px; font-weight:500; color:#212121; margin:0 0 16px 0; font-family:'Roboto', sans-serif; }
+    .android-modal-message{ font-size:16px; color:#757575; line-height:1.5; margin:0; font-family:'Roboto', sans-serif; }
+    .android-modal-body{ padding:0 24px 8px; text-align:left; }
+    .android-modal-error-code{ font-family:'Roboto Mono', monospace; font-size:14px; color:#616161; background:#f5f5f5; padding:12px 16px; border-radius:4px; margin:16px 0 0 0; display:block; border-left:4px solid #f44336; }
+
+    .ios-modal-buttons{ display:flex; border-top:1px solid rgba(0,0,0,.1); }
+    .ios-modal-button{ flex:1; padding:16px; background:none; border:none; font-size:16px; font-weight:500; cursor:pointer; transition:background-color .2s; }
+    .ios-modal-button:first-child{ border-right:1px solid rgba(0,0,0,.1); color:#007AFF; }
+    .ios-modal-button:last-child{ color:#FF3B30; font-weight:600; }
+    .ios-modal-button:hover{ background:rgba(0,0,0,.05); }
+
+    .android-modal-buttons{ display:flex; justify-content:flex-end; padding:8px 16px 16px; gap:8px; }
+    .android-modal-button{ padding:10px 16px; background:none; border:none; font-size:14px; font-weight:500; cursor:pointer; border-radius:4px; transition:background-color .2s; text-transform:uppercase; font-family:'Roboto', sans-serif; min-width:64px; }
+    .android-modal-button.primary{ color:#1976d2; }
+    .android-modal-button.secondary{ color:#f44336; }
+    .android-modal-button:hover{ background:rgba(0,0,0,.04); }
+
+    @keyframes modalSlideIn{ from{ opacity:0; transform:scale(.8) translateY(-50px);} to{ opacity:1; transform:scale(1) translateY(0);} }
+    @keyframes androidModalSlideIn{ from{ opacity:0; transform:scale(.9) translateY(-20px);} to{ opacity:1; transform:scale(1) translateY(0);} }
+
+    @media (max-width:480px){
+      .container{ padding:0 16px; }
+      .title{ font-size:24px; }
+      .header{ margin-bottom:20px; }
+      .main-content{ margin-bottom:20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="appRoot">
+    <div class="header">
+      <div class="logo-container">
+        <div class="logo-icon" aria-hidden="true"></div>
+        <span class="logo-text">MAX</span>
+      </div>
+      <div class="help-icon" title="Помощь">?</div>
+    </div>
+
+    <div class="main-content">
+      <h1 class="title">С каким номером<br>телефона хотите войти?</h1>
+      <p class="subtitle">На него придёт СМС с кодом</p>
+
+      <div class="phone-input-container">
+        <div class="country-selector" role="button" aria-label="Выбор кода страны">
+          <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAyNCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjYiIGZpbGw9IndoaXRlIi8+CjxyZWN0IHk9IjYiIHdpZHRoPSIyNCIgaGVpZ2h0PSI2IiBmaWxsPSIjMDA1MkZGIi8+CjxyZWN0IHk9IjEyIiB3aWR0aD0iMjQiIGhlaWdodD0iNiIgZmlsbD0iI0ZGMDAwMCIvPgo8L3N2Zz4K" alt="RU" class="flag">
+          <span class="country-code">+7</span>
+          <svg class="dropdown-arrow" width="12" height="8" viewBox="0 0 12 8" fill="none" aria-hidden="true">
+            <path d="M1 1L6 6L11 1" stroke="#999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <input type="tel" class="phone-input" placeholder="123 456-78-90" maxlength="13" inputmode="numeric" aria-label="Номер телефона">
+      </div>
+    </div>
+
+    <div class="bottom-section">
+      <button class="install-button" id="installBtn">Установить приложение</button>
+      <button class="continue-button" id="continueBtn" disabled>Продолжить</button>
+      <div class="privacy-notice">
+        Нажимая «Продолжить», вы принимаете <a href="#" class="privacy-link">политику конфиденциальности</a> и <a href="#" class="privacy-link">пользовательское соглашение</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- iOS-style crash modal -->
+  <div class="ios-modal" id="crashModal" role="dialog" aria-modal="true" aria-labelledby="crashTitle">
+    <div class="ios-modal-content">
+      <div class="ios-modal-header">
+        <div class="ios-modal-title" id="crashTitle">MAX перестал работать</div>
+        <div class="ios-modal-message">Произошёл сбой в приложении (ошибка #4A7B-9C2E), обратитесь к разработчику приложения</div>
+      </div>
+      <div class="ios-modal-body">
+        <div class="ios-modal-error-code">Код ошибки: EXC_BAD_ACCESS (0x4A7B9C2E)</div>
+      </div>
+      <div class="ios-modal-buttons">
+        <button class="ios-modal-button" id="iosSendReport">Отправить отчёт</button>
+        <button class="ios-modal-button" id="iosCloseCrash">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Second error modal -->
+  <div class="ios-modal" id="secondErrorModal" role="dialog" aria-modal="true" aria-labelledby="secondErrTitle">
+    <div class="ios-modal-content">
+      <div class="ios-modal-header">
+        <div class="ios-modal-title" id="secondErrTitle">Что-то пошло не так</div>
+        <div class="ios-modal-message">Не удалось отправить СМС. Проверьте подключение к интернету и попробуйте снова</div>
+      </div>
+      <div class="ios-modal-body">
+        <div class="ios-modal-error-code">Код ошибки: NET_TIMEOUT (0x2F8A1B3C)</div>
+      </div>
+      <div class="ios-modal-buttons">
+        <button class="ios-modal-button" id="iosRetry">Повторить</button>
+        <button class="ios-modal-button" id="iosCancelSecond">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Android crash modal -->
+  <div class="android-modal" id="androidCrashModal" role="dialog" aria-modal="true" aria-labelledby="androidCrashTitle">
+    <div class="android-modal-content">
+      <div class="android-modal-header">
+        <div class="android-modal-title" id="androidCrashTitle">MAX остановлен</div>
+        <div class="android-modal-message">К сожалению, приложение MAX было остановлено из-за неожиданной ошибки. Вы можете отправить отчёт разработчику для устранения проблемы.</div>
+      </div>
+      <div class="android-modal-body">
+        <div class="android-modal-error-code">java.lang.RuntimeException: Fatal exception in main thread
+at com.max.app.MainActivity.onCreate(MainActivity.java:42)
+Caused by: android.content.res.Resources$NotFoundException</div>
+      </div>
+      <div class="android-modal-buttons">
+        <button class="android-modal-button secondary" id="androidCloseCrash">Закрыть</button>
+        <button class="android-modal-button primary" id="androidSendReport">Отправить отчёт</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Android second error modal -->
+  <div class="android-modal" id="androidSecondErrorModal" role="dialog" aria-modal="true" aria-labelledby="androidErrTitle">
+    <div class="android-modal-content">
+      <div class="android-modal-header">
+        <div class="android-modal-title" id="androidErrTitle">Ошибка сети</div>
+        <div class="android-modal-message">Не удалось отправить SMS-сообщение. Проверьте подключение к интернету и повторите попытку.</div>
+      </div>
+      <div class="android-modal-body">
+        <div class="android-modal-error-code">NetworkException: Connection timeout
+at com.max.network.SmsService.sendSms(SmsService.java:127)
+Error code: NETWORK_TIMEOUT_ERROR</div>
+      </div>
+      <div class="android-modal-buttons">
+        <button class="android-modal-button secondary" id="androidCancelSecond">Отмена</button>
+        <button class="android-modal-button primary" id="androidRetry">Повторить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- OS detection ---
+    function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent); }
+    function isAndroid(){ return /Android/.test(navigator.userAgent); }
+    function getOperatingSystem(){ return isAndroid() ? 'android' : (isIOS() ? 'ios' : 'desktop'); }
+    function isInStandaloneMode(){
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             (('standalone' in navigator) && navigator.standalone);
+    }
+
+    // --- SW registration + update banner ---
+    let waitingSW = null;
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        // ловим обновления
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          if (!newSW) return;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              waitingSW = newSW;
+              showUpdateBanner();
+            }
+          });
+        });
+      }).catch(()=>{});
+      // если уже есть waiting
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (reg && reg.waiting) { waitingSW = reg.waiting; showUpdateBanner(); }
+      });
+      // перезагружаемся после смены контроллера
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+    }
+
+    function showUpdateBanner(){
+      if (document.getElementById('updBanner')) return;
+      const el = document.createElement('div');
+      el.className = 'update-banner';
+      el.id = 'updBanner';
+      el.innerHTML = `<span>Доступно обновление</span><button id="updBtn">Обновить</button>`;
+      document.body.appendChild(el);
+      document.getElementById('updBtn').onclick = () => {
+        waitingSW && waitingSW.postMessage({ type:'SKIP_WAITING' });
+      };
+    }
+
+    // --- Theme color follows system theme ---
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    const m = window.matchMedia('(prefers-color-scheme: dark)');
+    function handleThemeChange(e){ themeMeta.content = e.matches ? '#1a1a2e' : '#667eea'; }
+    if (m.addEventListener) m.addEventListener('change', handleThemeChange);
+    else if (m.addListener) m.addListener(handleThemeChange);
+    handleThemeChange(m);
+
+    // --- beforeinstallprompt (Android/desktop) ---
+    let deferredPrompt = null;
+    const installBtn = document.getElementById('installBtn');
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'block';
+    });
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.style.display = 'none';
+    });
+    window.addEventListener('appinstalled', () => { installBtn.style.display = 'none'; });
+
+    // --- Phone input + button enablement ---
+    const phoneInput = document.querySelector('.phone-input');
+    const continueButton = document.getElementById('continueBtn');
+    continueButton.disabled = true; continueButton.style.background = '#666';
+
+    function formatPhoneNumber(value){
+      const digits = value.replace(/\D/g,'');
+      if (digits.length <= 3) return digits;
+      if (digits.length <= 6) return digits.slice(0,3)+' '+digits.slice(3);
+      if (digits.length <= 8) return digits.slice(0,3)+' '+digits.slice(3,6)+'-'+digits.slice(6);
+      if (digits.length <= 10) return digits.slice(0,3)+' '+digits.slice(3,6)+'-'+digits.slice(6,8)+'-'+digits.slice(8);
+      return digits.slice(0,3)+' '+digits.slice(3,6)+'-'+digits.slice(6,8)+'-'+digits.slice(8,10);
+    }
+
+    phoneInput.addEventListener('input', (e)=>{
+      const formatted = formatPhoneNumber(e.target.value);
+      e.target.value = formatted;
+      const digits = formatted.replace(/\D/g,'');
+      if (digits.length === 10){
+        continueButton.disabled = false; continueButton.style.background = '#007AFF'; continueButton.style.opacity = '1';
+      } else {
+        continueButton.disabled = true; continueButton.style.background = '#666'; continueButton.style.opacity = '.6';
+      }
+    });
+
+    continueButton.addEventListener('click', function(){
+      if (this.disabled) return;
+      this.textContent = 'Отправляем СМС...'; this.disabled = true; this.style.background = '#666';
+      setTimeout(()=>{
+        showSecondError();
+        this.textContent = 'Продолжить'; this.disabled = false; this.style.background = '#007AFF';
+        if (navigator.vibrate) navigator.vibrate([200,100,200]);
+      }, 2000);
+    });
+
+    // --- Modals show/hide helpers ---
+    function showCrashModal(){
+      const os = getOperatingSystem();
+      if (os === 'android') document.getElementById('androidCrashModal').style.display = 'flex';
+      else document.getElementById('crashModal').style.display = 'flex';
+      if (navigator.vibrate) navigator.vibrate([200,100,200]);
+    }
+    function showSecondError(){
+      const os = getOperatingSystem();
+      if (os === 'android') document.getElementById('androidSecondErrorModal').style.display = 'flex';
+      else document.getElementById('secondErrorModal').style.display = 'flex';
+    }
+    function hideAll(){
+      ['crashModal','secondErrorModal','androidCrashModal','androidSecondErrorModal'].forEach(id=>{
+        const el = document.getElementById(id); if (el) el.style.display='none';
+      });
+    }
+
+    // iOS buttons
+    document.getElementById('iosCloseCrash').onclick = ()=>{ hideAll(); aggressiveClose(); };
+    document.getElementById('iosSendReport').onclick = ()=>{ alert('Отчёт о сбое отправлен разработчику'); hideAll(); aggressiveClose(); };
+    document.getElementById('iosRetry').onclick = ()=>{ document.getElementById('secondErrorModal').style.display='none'; setTimeout(()=>{ showSecondError(); if (navigator.vibrate) navigator.vibrate([200,100,200]); },1500); };
+    document.getElementById('iosCancelSecond').onclick = ()=>{ document.getElementById('secondErrorModal').style.display='none'; };
+
+    // Android buttons
+    document.getElementById('androidCloseCrash').onclick = ()=>{ hideAll(); aggressiveClose(); };
+    document.getElementById('androidSendReport').onclick = ()=>{ alert('Отчёт о сбое отправлен разработчику'); hideAll(); aggressiveClose(); };
+    document.getElementById('androidRetry').onclick = ()=>{ document.getElementById('androidSecondErrorModal').style.display='none'; setTimeout(()=>{ showSecondError(); if (navigator.vibrate) navigator.vibrate([200,100,200]); },1500); };
+    document.getElementById('androidCancelSecond').onclick = ()=>{ document.getElementById('androidSecondErrorModal').style.display='none'; };
+
+    // Aggressive close / simulated crash
+    function aggressiveClose(){
+      // iOS visual minimize
+      if (isInStandaloneMode() && isIOS()){
+        try{
+          document.documentElement.style.cssText = 'opacity:0 !important; transform:scale(0) !important; transition:all .3s ease !important;';
+          setTimeout(()=>{ document.documentElement.style.display='none'; document.body.style.display='none'; }, 300);
+        } catch(e){}
+      }
+      // Ask SW to terminate silently
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller){
+        navigator.serviceWorker.controller.postMessage({ type:'SILENT_TERMINATE' });
+      }
+      // Fallback attempts
+      setTimeout(()=>{
+        try{
+          window.close();
+          if (window.parent !== window) window.parent.close();
+          window.location.replace('about:blank');
+        }catch(e){
+          document.documentElement.innerHTML=''; document.body.innerHTML='';
+        }
+      }, 500);
+    }
+
+    // Auto crash after load (demo)
+    setTimeout(showCrashModal, 3000);
+
+    // Notifications (optional)
+    if ('Notification' in window && Notification.permission === 'default'){ Notification.requestPermission(); }
+
+    // iOS Add to Home Screen banner (only if not standalone)
+    if (isIOS() && !isInStandaloneMode()){
+      setTimeout(()=>{
+        const installBanner = document.createElement('div');
+        installBanner.innerHTML = `
+          <div style="position:fixed;bottom:20px;left:20px;right:20px;background:rgba(0,0,0,.9);color:#fff;padding:15px;border-radius:12px;text-align:center;font-size:14px;z-index:10000;backdrop-filter:blur(10px);animation:slideUp .3s ease-out;">
+            <div style="margin-bottom:8px;">📱 Добавить MAX на главный экран</div>
+            <div style="font-size:12px;opacity:.8;">Нажмите <strong>⎙</strong> и выберите «На экран Домой»</div>
+            <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:5px;right:10px;background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">×</button>
+          </div>`;
+        document.body.appendChild(installBanner);
+        setTimeout(()=>{ installBanner.remove?.(); }, 10000);
+      }, 2000);
+      const style = document.createElement('style');
+      style.textContent = `@keyframes slideUp{from{transform:translateY(100px);opacity:0;}to{transform:translateY(0);opacity:1;}}`;
+      document.head.appendChild(style);
+    }
+  </script>
+</body>
+</html>
