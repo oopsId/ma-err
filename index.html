@@ -255,7 +255,7 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
     // --- SW registration + update banner ---
     let waitingSW = null;
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js').then(reg => {
+      navigator.serviceWorker.register('./sw.js').then(reg => {
         // ловим обновления
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
@@ -429,3 +429,4 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
   </script>
 </body>
 </html>
+
