@@ -73,6 +73,16 @@ async function offlineFallback() {
          new Response(OFFLINE_HTML, { headers:{'Content-Type':'text/html; charset=utf-8'} });
 }
 
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 // Fetch-стратегии:
 // - Навигации (HTML): network-first (+preload), затем shell, затем оффлайн.
 // - Статика своего домена: stale-while-revalidate.
@@ -157,3 +167,4 @@ self.addEventListener('message', (event) => {
   }
   if (msg.type === 'SKIP_WAITING') self.skipWaiting();
 });
+
