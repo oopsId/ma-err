@@ -21,6 +21,7 @@ const US = (p) => U(p).toString();
 const APP_SHELL = [
   US('./'),
   US('index.html'),
+  US('404.html'),  
   US('manifest.json'),
   US('icons/icon-192.png'),
   US('icons/icon-512.png')
@@ -168,3 +169,4 @@ self.addEventListener('fetch', (event) => {
     catch(_) { return (await caches.match(request)) || await offlineFallback(); }
   })());
 });
+
