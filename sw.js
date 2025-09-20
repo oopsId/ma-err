@@ -1,33 +1,31 @@
-/* sw.js — PWA Service Worker для MAX (GitHub Pages friendly)
-   — Скоуп-осознанные пути (работает в подкаталоге /repo/)
-   — Предкеш оболочки, оффлайн-страница, SPA-фоллбек
-   — Навигационный preload, кэш Google Fonts
-   — Обновления по кнопке через SKIP_WAITING + clients.claim()
-   Цвета: theme=#667eea, background=#E8E5FF
+/* sw.js — PWA Service Worker для MAX (демо, 404 + closed)
+   Предкеш оболочки, оффлайн, обновления, навигационный preload,
+   кэширование Google Fonts. Цвета: theme=#667eea, background=#E8E5FF
 */
-const VERSION = '1.3.1';
-const PREFIX  = 'max';
+const VERSION = '1.3.4';
+const PREFIX  = 'maxdemo';
 const SHELL   = `${PREFIX}-shell-${VERSION}`;
 const RUNTIME = `${PREFIX}-rt-${VERSION}`;
 
 const THEME = '#667eea';
 const BG    = '#E8E5FF';
 
-/* Скоуп SW (важно для Pages/подкаталога) */
-const SCOPE = self.registration?.scope || self.location.href;
-const U  = (p) => new URL(p, SCOPE);
-const US = (p) => U(p).toString();
+// База для абсолютных URL (работает и на user.github.io/repo, и на кастомном домене)
+const SCOPE = self.registration ? new URL(self.registration.scope) : new URL('./', self.location);
+const ORIGIN = SCOPE.origin;
+const U = (p) => new URL(p, SCOPE).toString();
 
 const APP_SHELL = [
-  US('./'),
-  US('index.html'),
-  US('404.html'),  
-  US('manifest.json'),
-  US('icons/icon-192.png'),
-  US('icons/icon-512.png')
+  U('./'),
+  U('index.html'),
+  U('404.html'),
+  U('__closed.html'),
+  U('site.webmanifest'),
+  U('icons/icon-192.png'),
+  U('icons/icon-512.png')
 ];
 
-// оффлайн-экран (встроенный)
+// Оффлайн-экран (встроенный)
 const OFFLINE_HTML = `
 <!doctype html><html lang="ru"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -51,94 +49,94 @@ small{display:block;margin-top:10px;color:#6b6a86}
 <small>Демо оффлайн-страница (theme=${THEME}, bg=${BG})</small>
 </div></div></body></html>`;
 
-const OFFLINE_KEY = US('__offline.html');
-
-/* INSTALL — больше НЕТ авто-skipWaiting! */
+// Установка
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(SHELL);
     for (const url of APP_SHELL) {
-      try { await cache.add(new Request(url, { credentials:'same-origin' })); } catch(_) {}
+      try { await cache.add(new Request(url, { credentials: 'same-origin' })); } catch(_) {}
     }
-    await cache.put(OFFLINE_KEY, new Response(OFFLINE_HTML, {
-      headers:{'Content-Type':'text/html; charset=utf-8'}
-    }));
-    // ВАЖНО: не вызываем self.skipWaiting() — ждём ручного клика "Обновить"
+    // подкинем встроенный оффлайн как отдельный ресурс
+    await cache.put(U('__offline.html'), new Response(OFFLINE_HTML, { headers: {'Content-Type':'text/html; charset=utf-8'} }));
+    await self.skipWaiting();
   })());
 });
 
-/* ACTIVATE */
+// Активация
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     if (self.registration.navigationPreload) {
       try { await self.registration.navigationPreload.enable(); } catch(_) {}
     }
     const keys = await caches.keys();
-    await Promise.all(
-      keys.map(k => (k.startsWith(PREFIX) && k !== SHELL && k !== RUNTIME) ? caches.delete(k) : null)
-    );
+    await Promise.all(keys.map(k => (k.startsWith(PREFIX) && k !== SHELL && k !== RUNTIME) ? caches.delete(k) : null));
     await self.clients.claim();
   })());
 });
 
-/* MESSAGES */
+// Сообщения от клиента
 self.addEventListener('message', (event) => {
   const msg = event?.data || {};
-  if (msg.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (msg.type === 'SKIP_WAITING') self.skipWaiting();
   if (msg.type === 'SILENT_TERMINATE') {
     event.waitUntil((async () => {
-      const clientsList = await self.clients.matchAll({ includeUncontrolled:true, type:'window' });
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
       for (const c of clientsList) {
-        try { await c.navigate(US('__closed.html')); } catch(_) {}
+        try { await c.navigate(U('__closed.html')); } catch(_) {}
       }
-      // при желании: await self.registration.unregister();
     })());
   }
 });
 
-/* HELPERS */
+// Хелпер оффлайна
 async function offlineFallback() {
-  const cached = await caches.match(OFFLINE_KEY);
-  if (cached) return cached;
-  return new Response(OFFLINE_HTML, { headers:{'Content-Type':'text/html; charset=utf-8'} });
+  return (await caches.match(U('__offline.html'))) ||
+         new Response(OFFLINE_HTML, { headers:{'Content-Type':'text/html; charset=utf-8'} });
 }
-const isStatic = (url) => /\.(css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(url.pathname);
 
-/* FETCH */
+// Fetch
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  const isGF = (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com');
+  const isGoogleFonts = (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com');
 
-  // Навигации (HTML): network-first (+preload) → shell → оффлайн/SPA
+  // Навигации (HTML)
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try {
         const preload = await event.preloadResponse;
         if (preload) return preload;
 
-        const network = await fetch(request, { credentials:'same-origin' });
+        const network = await fetch(request, { credentials: 'same-origin' });
+        if (network && network.status === 404) {
+          const page404 = await caches.match(U('404.html'));
+          return page404 || new Response('Not found', { status: 404 });
+        }
         if (network && network.ok) return network;
 
-        const shell = await caches.match(US('index.html')) || await caches.match(request);
-        return shell || await offlineFallback();
+        // Не OK, попробуем shell → 404 → оффлайн
+        const shell = await caches.match(U('index.html'));
+        if (shell) return shell;
+        const page404 = await caches.match(U('404.html'));
+        return page404 || await offlineFallback();
       } catch (_) {
-        const shell = await caches.match(US('index.html')) || await caches.match(request);
-        return shell || await offlineFallback();
+        // Сеть упала: shell → 404 → оффлайн
+        const shell = await caches.match(U('index.html'));
+        if (shell) return shell;
+        const page404 = await caches.match(U('404.html'));
+        return page404 || await offlineFallback();
       }
     })());
     return;
   }
 
-  // Google Fonts: stale-while-revalidate (кэшируем opaque и 200)
-  if (isGF) {
+  // Google Fonts: stale-while-revalidate
+  if (isGoogleFonts) {
     event.respondWith((async () => {
       const cache = await caches.open(RUNTIME);
       const cached = await cache.match(request);
-      const fetched = fetch(request, { mode:'no-cors' }).then(resp => {
+      const fetched = fetch(request, { mode: 'no-cors' }).then(resp => {
         if (resp) cache.put(request, resp.clone()).catch(()=>{});
         return resp;
       }).catch(()=>null);
@@ -148,7 +146,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Своя статика: stale-while-revalidate
-  if (url.origin === location.origin && isStatic(url)) {
+  if (url.origin === ORIGIN && /\.(css|js|mjs|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf)$/i.test(url.pathname)) {
     event.respondWith((async () => {
       const cache = await caches.open(RUNTIME);
       const cached = await cache.match(request);
@@ -163,10 +161,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Остальное: сеть → кэш → оффлайн
+  // Прочее: сеть → кеш → оффлайн
   event.respondWith((async () => {
     try { return await fetch(request); }
     catch(_) { return (await caches.match(request)) || await offlineFallback(); }
   })());
 });
-
