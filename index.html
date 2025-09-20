@@ -16,7 +16,8 @@
   <meta name="msapplication-TileImage" content="icons/icon-144.png">
 
   <!-- Manifest + Icons -->
-  <link rel="manifest" href="manifest.json">
+  <!-- ВАЖНО: файл манифеста назови site.webmanifest (или замени href обратно на manifest.json, если не переименовал) -->
+  <link rel="manifest" href="site.webmanifest" crossorigin="anonymous">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
   <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
   <link rel="apple-touch-icon" sizes="120x120" href="icons/icon-120.png">
@@ -27,6 +28,22 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
   <link rel="shortcut icon" href="icons/icon-32.png">
+
+  <!-- SPA GitHub Pages decoder: превращает /?/path -> /path, чтобы убрать чужую 404 и восстановить маршрут -->
+  <script>
+    (function () {
+      var l = window.location;
+      if (l.search && l.search.startsWith('?/')) {
+        var rest = l.search.slice(2).split('&');
+        var path = decodeURIComponent(rest.shift() || '');
+        var query = rest.join('&').replace(/~and~/g, '&');
+        var segs = l.pathname.split('/').filter(Boolean);
+        var base = (/\.github\.io$/.test(l.hostname) && segs.length) ? '/' + segs[0] : '';
+        var newUrl = base + '/' + path + (query ? ('?' + query) : '') + l.hash;
+        window.history.replaceState(null, '', newUrl);
+      }
+    })();
+  </script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -87,7 +104,7 @@
 
     .install-button{ width:100%; padding:12px; background:#667eea; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px; display:none; }
 
-    /* Тост обновления (имя без слова banner, чтобы адблоки не резали) */
+    /* Тост обновления (без слова "banner", чтобы блокировщики не резали) */
     .app-update{
       position:fixed; left:12px; right:12px; bottom:12px;
       background:#1f2937; color:#fff; padding:10px 12px; border-radius:10px;
@@ -282,12 +299,7 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').then(async (reg) => {
-        // уже есть waiting (повторный визит)
-        if (reg.waiting) {
-          waitingSW = reg.waiting;
-          showUpdateToast();
-        }
-        // появление нового SW
+        if (reg.waiting) { waitingSW = reg.waiting; showUpdateToast(); }
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
           if (!newSW) return;
@@ -298,9 +310,7 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
             }
           });
         });
-        // после skipWaiting → автоматический reload
         navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
-        // явные проверки обновлений
         try { await reg.update(); } catch(e) {}
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') reg.update().catch(()=>{});
@@ -330,7 +340,6 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
 
     installBtn.addEventListener('click', async () => {
       if (!deferredPrompt) {
-        // Фоллбек-подсказка
         if (isAndroid) {
           alert('Если кнопка установки не появилась: меню ⋮ в Chrome → «Установить приложение».');
         } else if (isIOS) {
