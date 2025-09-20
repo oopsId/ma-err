@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>Страница не найдена · MAX</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#667eea">
+  <link rel="icon" href="icons/icon-32.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+    :root{ --bg:#E8E5FF; --bg2:#F5F3FF; --fg:#1a1a1a; --accent:#667eea; }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#1a1a2e; --bg2:#16213e; --fg:#ffffff; }
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;
+      background: linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+      color:var(--fg); display:grid; place-items:center; padding:24px;
+    }
+    .card{
+      width:min(520px,92vw); background:#fff10; /* прозрачный по умолчанию */
+      backdrop-filter: blur(12px);
+      border-radius:16px; padding:20px;
+      box-shadow:0 12px 30px rgba(0,0,0,.12);
+      border:1px solid rgba(0,0,0,.08);
+    }
+    .title{font-size:22px; font-weight:600; margin-bottom:8px}
+    .desc{opacity:.8; line-height:1.5; margin-bottom:16px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; opacity:.75; word-break:break-all; margin-bottom:16px}
+    .row{display:flex; gap:10px; flex-wrap:wrap}
+    button,a.btn{
+      appearance:none; border:0; border-radius:12px; padding:10px 14px;
+      font-weight:600; cursor:pointer; text-decoration:none; display:inline-block
+    }
+    .primary{ background:var(--accent); color:#fff }
+    .ghost{ background:#f4f2ff; color:#2b2463; border:1px solid #ded9ff }
+    @media (prefers-color-scheme: dark){
+      .card{ background: rgba(44,44,46,.85); border-color: rgba(255,255,255,.12); }
+      .ghost{ background:#2a2a4a; color:#fff; border-color:#3e3e6a }
+    }
+  </style>
+
+  <!-- SPA GitHub Pages redirect (адаптируется к /repo/ и к корню/кастомному домену) -->
+  <script>
+    (function () {
+      var l = window.location;
+      // определяем, проектная страница ли это (user.github.io/repo) или корень/кастомный домен
+      var pathParts = l.pathname.replace(/\/+$/,'').split('/').filter(Boolean);
+      var inGhProject = /\.github\.io$/.test(l.hostname) && pathParts.length > 0;
+      var repoBase = inGhProject ? '/' + pathParts[0] : '';
+      // исходный путь (без ведущих repoBase для project pages)
+      var cleanPath = l.pathname.replace(new RegExp('^' + repoBase), '').replace(/^\/+/, '');
+      // кодируем query так, как советует классический spa-github-pages (замена & -> ~and~)
+      var query = l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '';
+      var target = l.protocol + '//' + l.host + repoBase + '/?/' + cleanPath + query + l.hash;
+
+      // Если JS включён — сразу редиректим на SPA-роутер в index.html
+      l.replace(target);
+    })();
+  </script>
+</head>
+<body>
+  <!-- Фоллбек, если у пользователя выключен JS -->
+  <div class="card" role="status" aria-live="polite">
+    <div class="title">Страница не найдена (404)</div>
+    <p class="desc">Кажется, такого адреса больше нет. Вернёмся на главный экран приложения?</p>
+    <p class="mono" id="path"></p>
+    <div class="row">
+      <a class="btn primary" id="homeLink" href="./">На главный</a>
+      <button class="ghost" onclick="history.back()">Назад</button>
+    </div>
+  </div>
+  <script>
+    // Отобразим путь пользователю, если скрипт не редиректнул мгновенно (медленный интернет, блокировщик, и т.п.)
+    (function(){
+      try{
+        var p = document.getElementById('path');
+        p.textContent = window.location.pathname + window.location.search + window.location.hash;
+        // скорректируем ссылку "На главный" под /repo/
+        var l = window.location;
+        var parts = l.pathname.split('/').filter(Boolean);
+        var base = (/\.github\.io$/.test(l.hostname) && parts.length) ? '/' + parts[0] + '/' : '/';
+        document.getElementById('homeLink').setAttribute('href', base);
+      }catch(e){}
+    })();
+  </script>
+</body>
+</html>
