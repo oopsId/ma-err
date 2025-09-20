@@ -1,22 +1,69 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="utf-8">
+  <title>MAX · Приложение закрыто</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Приложение закрыто</title>
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#667eea">
+  <link rel="icon" href="icons/icon-32.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
   <style>
-    *{box-sizing:border-box} html,body{height:100%;margin:0}
-    body{background:#000;color:#fff;display:grid;place-items:center;font-family:system-ui,-apple-system,Segoe UI,Roboto}
-    .box{opacity:.82;text-align:center}
-    .box h1{font-size:18px;margin:0 0 6px 0}
-    .box p{margin:0;color:#c9c9c9}
+    :root{ --bg:#E8E5FF; --bg2:#F5F3FF; --fg:#1a1a1a; --accent:#667eea }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#1a1a2e; --bg2:#16213e; --fg:#fff; }
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;
+      background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+      color:var(--fg); display:grid; place-items:center; padding:24px;
+    }
+    .card{
+      width:min(520px,92vw);
+      background:rgba(255,255,255,.75);
+      backdrop-filter:blur(12px);
+      border-radius:16px; padding:20px;
+      box-shadow:0 12px 30px rgba(0,0,0,.12);
+      border:1px solid rgba(0,0,0,.08);
+    }
+    h1{font-size:20px;margin-bottom:8px}
+    p{opacity:.85;line-height:1.6;margin-bottom:16px}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
+    .primary{background:var(--accent);color:#fff}
+    .ghost{background:#f4f2ff;color:#2b2463;border:1px solid #ded9ff}
+    @media (prefers-color-scheme: dark){
+      .card{background:rgba(44,44,46,.85);border-color:rgba(255,255,255,.12)}
+      .ghost{background:#2a2a4a;color:#fff;border-color:#3e3e6a}
+    }
   </style>
 </head>
 <body>
-  <div class="box">
-    <h1>Приложение закрыто</h1>
-    <p>Вы можете закрыть окно или вернуться назад.</p>
+  <div class="card" role="status" aria-live="polite">
+    <h1>MAX был принудительно закрыт</h1>
+    <p>Приложение завершило работу. Вы можете открыть его заново или очистить кэш.</p>
+    <div class="row">
+      <button class="primary" onclick="location.href='index.html'">Открыть снова</button>
+      <button class="ghost" id="clear">Очистить кэш</button>
+    </div>
   </div>
+  <script>
+    document.getElementById('clear').onclick = async () => {
+      try {
+        if ('caches' in self) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map(k => caches.delete(k)));
+        }
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          await reg?.unregister();
+        }
+        alert('Кэш очищен. Перезагрузите страницу.');
+        location.reload();
+      } catch (e) { console.log(e); }
+    };
+  </script>
 </body>
 </html>
+
